@@ -5,6 +5,7 @@
  *
  * @author  fengqi <lyf362345@gmail.com>
  * @Modified_by ankit nigam @ankit__nigam
+ * @Modified_by kikunae for WD My Cloud EX2
  * @link    https://github.com/fengqi/transmission-rss
  */
 class Transmission
@@ -15,7 +16,7 @@ class Transmission
     private $session_id;
 
     /**
-     * æž„é€ å‡½æ•°, åˆå§‹åŒ–é…ç½®
+     * 입력 받은 값으로 초기값 설정
      *
      * @param $server
      * @param string $port
@@ -34,7 +35,7 @@ class Transmission
     }
 
     /**
-     * æ·»åŠ ç§å­, å¦‚æžœæ˜¯ç§å­çš„åŽŸå§‹äºŒè¿›åˆ¶, éœ€è¦å…ˆè¿›è¡Œ base64 ç¼–ç 
+     * seed 추가하기 이진데이터인 경우 base64로 인코드
      *
      * @param $url
      * @param bool $isEncode
@@ -49,7 +50,7 @@ class Transmission
     }
 
     /**
-     * èŽ·å– Transmission æœåŠ¡å™¨çŠ¶æ€
+     * Transmission 서버 상태 가져오기
      *
      * @return mixed
      */
@@ -59,7 +60,7 @@ class Transmission
     }
 
     /**
-     * èŽ·å– Transmission session-id, æ¯æ¬¡ rpc è¯·æ±‚éƒ½éœ€è¦å¸¦ä¸Š session-id
+     * Transmission session-id 가져오기
      *
      * @return string
      */
@@ -81,10 +82,10 @@ class Transmission
     }
 
     /**
-     * æ‰§è¡Œ rpc è¯·æ±‚
+     * rpc에 요청 보내기
      *
-     * @param $method è¯·æ±‚ç±»åž‹/æ–¹æ³•, è¯¦è§ $this->allowMethods
-     * @param array $arguments é™„åŠ å‚æ•°, å¯é€‰
+     * @param $method 요청 방식, $this->allowMethods 참조
+     * @param array $arguments 인수
      * @return mixed
      */
     private function request($method, $arguments = array())
@@ -119,7 +120,7 @@ class Transmission
     }
 
     /**
-     * èŽ·å– rss çš„ç§å­åˆ—è¡¨
+     * rss 에서 seed 목록 가져오기
      *
      * @param $rss
      * @return array
@@ -129,9 +130,14 @@ class Transmission
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_HEADER, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 90);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_USERAGENT,"Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36");
+        curl_setopt($ch, CURLOPT_COOKIE, "Cookie: CUPID=e4dfd575a42dc6c57d75cc885fa4a24a");
+        curl_setopt($ch, CURLOPT_REFERER, "http://www.google.com/bot.html");
+  		curl_setopt($ch, CURLOPT_AUTOREFERER, true);
+  		curl_setopt($ch, CURLOPT_COOKIESESSION, true);
 
         $items = array();
         foreach ($rss as $link) {
@@ -160,44 +166,52 @@ class Transmission
     }
 }
 
-// é…ç½®
+// 설정
 $rss = array(
-    'http://chdbits.org/torrentrss.php...',
-    'http://totheglory.im/putrssmc.php...',
-    'https://hdcmct.org/torrentrss.php...',
-    'https://open.cd/torrentrss.php?.....',
-    'https://mv.open.cd/torrentrss.php?..',
-    'http://hdwing.com/rss.php?..........',
-    'http://hdtime.org/torrentrss.php?...'
+    'http://rss 주소 1',
+    'http://rss 주소 2',
+    'https://rss 주소 3'
 );
-$server = 'http://192.168.2.0';
-$port = 9091;
-$rpcPath = '/transmission/rpc';
-$user = '';
+$server = 'http://192.168.2.0';     // Transmission-rpc 연결 주소. 내부에서 실행하므로 그대로 두면 됨.
+$port = 9091;                       // Transmission-rpc 포트. 변경하지 않았으면 그냥 두면 됨.
+$rpcPath = '/transmission/rpc';     // rpc 연결 경로. 변경하지 않았으면 그냥 두면 됨.
+$user = '';                         // Transmission setting.json 설정 파일에서 아이디, 암호 입력 하도록 설정했으면 해당 설정 내용 입력
 $password = '';
-$file = '';
+$file = '/mnt/HD/HD_a2/added_list.log'; // 기존에 다운받은 파일을 다시 추가하지 않기 위한 이미 추가했던 seed 파일명을 기록할 파일의 경로 및 파일 이름
 $pushbullet_script = '';
 $trans = new Transmission($server, $port, $rpcPath, $user, $password);
 $torrents = $trans->getRssItems($rss);
+
 foreach ($torrents as $torrent) {
-    $exists = 0;
+    $exists = 0;    // seed가 이미 기존에 추가됐던 것인지 여부를 표시하는 변수
     $search = $torrent['title'];
-    $lines = file($file);
-    foreach($lines as $line){
-      if(strpos($line, $search) !== false){
-      $exists = 1;
-      printf("%s: Torrent Already Downloaded / or in queue: %s\n", date('Y-m-d H:i:s'), $torrent['title']);
-      }
+    
+    $match = 0; // 정규식으로 원하는 단어를 포함하는 경우에만 추가되도록 단어를 포함했는지의 여부를 표시하는 변수
+    if (preg_match('/(720p-NEXT|720p NEXT)/i', $search)) { // 릴그룹 및 동영상 해상도 판별 정규식
+		    if (preg_match('/(런닝맨|라디오스타)/',$search)) { // 포함되길 원하는 단어로 ()안의 단어 수정, 여러개의 단어를 or 조건으로 판별시 '|'로 구분
+		    	  $match = 1;
+		    }
     }
-    if($exists == 0){
-      $response = json_decode($trans->add($torrent['link']));
-      if ($response->result == 'success') {
-          printf("%s: success add torrent: %s\n", date('Y-m-d H:i:s'), $torrent['title']);
-          $message = $torrent['title'].PHP_EOL;
-          file_put_contents($file, $message, FILE_APPEND | LOCK_EX);
-          $mystring = system("python $pushbullet_script $message");
-          echo $mystring;
-      }
+    
+    if ($match) {
+        $lines = file($file);
+        foreach($lines as $line){
+          if(strpos($line, $search) !== false){
+          $exists = 1;
+          printf("%s: Torrent Already Downloaded / or in queue: %s\n", date('Y-m-d H:i:s'), $torrent['title']);
+          }
+        }
+        if($exists == 0){
+          $response = json_decode($trans->add($torrent['link']));
+          if ($response->result == 'success') {
+              printf("%s: success add torrent: %s\n", date('Y-m-d H:i:s'), $torrent['title']);
+              $message = $torrent['title'].PHP_EOL;
+              file_put_contents($file, $message, FILE_APPEND | LOCK_EX);
+              # WD My Cloud EX2는 python을 지원하지 않으므로 pushbullet으로 메시지 보내는 부분 주석 처리
+              # $mystring = system("python $pushbullet_script $message");
+              # echo $mystring;
+          }
+        }
     }
 }
 
